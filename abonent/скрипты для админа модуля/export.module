@@ -1,0 +1,243 @@
+<?php
+
+function export_menu() {
+  $items['export/form'] = array(
+    'title' => 'Импорт/Экспорт данных',
+    'page callback' => 'export_form',
+    'access arguments' => array('access content'),
+    'description' => 'Импорт/Экспорт данных',
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+
+function export_form() {
+  return drupal_get_form('export_myform');
+}
+
+
+function export_myform($form_state) {
+
+ $form['SCH'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Экспорт данных по приборам',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+
+  $form['SCH']['next'] = array(
+    '#id' => 'no',
+    '#type' => 'submit',
+    '#value' => "Далее",
+  );
+
+ $form['ACTIVE'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Экспорт данных по активации абонентов',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+
+  $form['ACTIVE']['GO'] = array(
+    '#id' => 'nah',
+    '#type' => 'submit',
+    '#value' => "Экспорт",
+  );
+
+   $form['IMPORT'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'ОБЯЗАТЕЛЬНАЯ ПРОЦЕДУРА ПРИ ИМПОРТЕ ДАННЫХ ИЗ 1С',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+
+  $form['IMPORT']['DEL'] = array(
+    '#id' => 'vah',
+    '#type' => 'submit',
+    '#value' => "ИМПОРТ",
+  );
+
+
+   return $form;
+}
+
+function export_myform_submit($form, &$form_state) {
+	if ($form_state['clicked_button']['#id'] == 'nah') {
+drupal_set_message('Экспорт данных по активации абонентов!');
+
+//Вставка данных из MySQL
+	global $db_url;
+	$db_url = array(
+	"default"=>$db_url,
+	"db1"=>"mysqli://abonent:Ab0nent@localhost/abonent"
+	);
+	db_set_active('db1');
+	$queryResult = db_query("SELECT * from podr order by id");
+	while ($row = db_fetch_array($queryResult)) {
+$C=$row["comment"];
+//********************************АКТИВАЦИЯ АБОНЕНТОВ***********************************************
+$csv =''; // создаем переменную, в которую записываем строки
+//	db_set_active('db1');
+	$queryResultS = db_query("SELECT datain.LSHET, datain.CHK, kuya.PODR from datain, kuya where (datain.LSHET = kuya.LSHET) and (datain.CHK = '1') and (kuya.PODR = ".$row["podr"].") order by LSHET");
+//***Занесение данных в переменную
+	while ($rows = db_fetch_array($queryResultS)) {
+	$csv .= ''.$rows["LSHET"].'|'.$rows["CHK"].''."\r\n";
+	}
+//Изменение поля CHK = 0 чтобы абонент не попал в следующую загрузку
+
+$d = date("Ymd");
+   if ($csv <> "") {
+	$file_name = $C.'a_'.$d.'.txt'; // название файла XXa_YYYYMMDD
+	$file = fopen($file_name,"w"); // открываем файл для записи, если его нет, то создаем его в текущей папке, где расположен скрипт
+	fwrite($file,trim($csv)); // записываем в файл строки
+	fclose($file); // закрываем файл
+	$to = "abonent@rgk76.ru"; //Кому
+	$from = "f0101@rgk76.ru"; //От кого
+	$subject = "LK - for load in AIS RNG"; //Тема
+	$message = ""; //Текст письма
+	$boundary = "---"; //Разделитель
+	/* Заголовки */
+	$headers = "From: $from\nReply-To: $from\n";
+	$headers .= "Content-Type: multipart/mixed; boundary=\"$boundary\"";
+	$body = "--$boundary\n";
+	/* Присоединяем текстовое сообщение */
+	$body .= "Content-type: text/html; charset='utf-8'\n";
+	$body .= "Content-Transfer-Encoding: quoted-printablenn";
+	$body .= "Content-Disposition: attachment; filename==?utf-8?B?".base64_encode($file_name)."?=\n\n";
+	$body .= $message."\n";
+	$body .= "--$boundary\n";
+	$file = fopen($file_name, "r"); //Открываем файл
+	$text = fread($file, filesize($file_name)); //Считываем весь файл
+	fclose($file); //Закрываем файл
+	/* Добавляем тип содержимого, кодируем текст файла и добавляем в тело письма */
+	$body .= "Content-Type: application/octet-stream; name==?utf-8?B?".base64_encode($file_name)."?=\n";
+	$body .= "Content-Transfer-Encoding: base64\n";
+	$body .= "Content-Disposition: attachment; filename==?utf-8?B?".base64_encode($file_name)."?=\n\n";
+	$body .= chunk_split(base64_encode($text))."\n";
+	$body .= "--".$boundary ."--\n";
+	mail($to, $subject, $body, $headers); //Отправляем письмо
+   }
+//*********************************************СЧЕТЧИКИ*************************************************
+$csvt =''; // создаем переменную, в которую записываем строки
+	$queryResultT = db_query("SELECT datain.LSHET, datain.SCH_IN, datain.DATE_SCH, kuya.PODR from datain, kuya where (datain.SCH_IN > '0') and (datain.SYSTEM <> '1') and (datain.LSHET = kuya.LSHET) and (kuya.PODR = ".$row["podr"].") order by LSHET");
+//***Занесение данных в переменную
+	while ($rowt = db_fetch_array($queryResultT)) {
+		$csvt .= ''.$rowt["LSHET"].'|'.$rowt["SCH_IN"].'|'.$rowt["DATE_SCH"].''."\r\n";
+	}
+//Изменение поля CHK = 0 чтобы абонент не попал в следующую загрузку
+$d = date("Ymd");
+   if ($csvt <> "") {
+	$file_name = $C.'s_'.$d.'.txt'; // название файла XXa_YYYYMMDD
+	$file = fopen($file_name,"w"); // открываем файл для записи, если его нет, то создаем его в текущей папке, где расположен скрипт
+	fwrite($file,trim($csvt)); // записываем в файл строки
+	fclose($file); // закрываем файл
+	$to = "abonent@rgk76.ru"; //Кому
+	$from = "f0101@rgk76.ru"; //От кого
+	$subject = "LK - for load in AIS RNG"; //Тема
+	$message = ""; //Текст письма
+	$boundary = "---"; //Разделитель
+	/* Заголовки */
+	$headers = "From: $from\nReply-To: $from\n";
+	$headers .= "Content-Type: multipart/mixed; boundary=\"$boundary\"";
+	$body = "--$boundary\n";
+	/* Присоединяем текстовое сообщение */
+	$body .= "Content-type: text/html; charset='utf-8'\n";
+	$body .= "Content-Transfer-Encoding: quoted-printablenn";
+	$body .= "Content-Disposition: attachment; filename==?utf-8?B?".base64_encode($file_name)."?=\n\n";
+	$body .= $message."\n";
+	$body .= "--$boundary\n";
+	$file = fopen($file_name, "r"); //Открываем файл
+	$text = fread($file, filesize($file_name)); //Считываем весь файл
+	fclose($file); //Закрываем файл
+	/* Добавляем тип содержимого, кодируем текст файла и добавляем в тело письма */
+	$body .= "Content-Type: application/octet-stream; name==?utf-8?B?".base64_encode($file_name)."?=\n";
+	$body .= "Content-Transfer-Encoding: base64\n";
+	$body .= "Content-Disposition: attachment; filename==?utf-8?B?".base64_encode($file_name)."?=\n\n";
+	$body .= chunk_split(base64_encode($text))."\n";
+	$body .= "--".$boundary ."--\n";
+	mail($to, $subject, $body, $headers); //Отправляем письмо
+   }
+	}
+$queryResult = db_query("UPDATE datain SET SYSTEM = '1' WHERE CHK = '1'");
+$queryResult = db_query("UPDATE datain SET SYSTEM = '1' WHERE SCH_IN > '0'");
+	db_set_active('default');
+	}
+
+
+
+if ($form_state['clicked_button']['#id'] == 'no') {
+	drupal_set_message('Экспорт даныых по приборам учета!');
+		$csv_file =''; // создаем переменную, в которую записываем строки
+	global $db_url;
+	$db_url = array(
+	"default"=>$db_url,
+	"db1"=>"mysqli://abonent:Ab0nent@localhost/abonent"
+	);
+	db_set_active('db1');
+	$queryResult = db_query("SELECT * from datain where (SCH_IN > '0') and (SYSTEM <> '1') order by LSHET");
+	//***Занесение данных в переменную
+		while ($row = db_fetch_array($queryResult)) {
+		$csv_file .= ''.$row["LSHET"].'|'.$row["SCH_IN"].'|'.$row["DATE_SCH"].''."\r\n";
+		}
+//Занести в таблицу datein значение SYSTEM = 1
+$queryResult = db_query("UPDATE datain SET SYSTEM = '1' WHERE SCH_IN > '0'");
+//
+	db_set_active('default');
+	$file_name = '/scripts/export.txt'; // название файла
+	$file = fopen($file_name,"w"); // открываем файл для записи, если его нет, то создаем его в текущей папке, где расположен скрипт
+	fwrite($file,trim($csv_file)); // записываем в файл строки
+	fclose($file); // закрываем файл
+	$to = "f0101@rgk76.ru"; //Кому
+	$from = "f0101@rgk76.ru"; //От кого
+	$subject = "LK - for load in AIS RNG"; //Тема
+	$message = "Данные по приборам учета SCH"; //Текст письма
+	$boundary = "---"; //Разделитель
+	/* Заголовки */
+	$headers = "From: $from\nReply-To: $from\n";
+	$headers .= "Content-Type: multipart/mixed; boundary=\"$boundary\"";
+	$body = "--$boundary\n";
+	/* Присоединяем текстовое сообщение */
+	$body .= "Content-type: text/html; charset='utf-8'\n";
+	$body .= "Content-Transfer-Encoding: quoted-printablenn";
+	$body .= "Content-Disposition: attachment; filename==?utf-8?B?".base64_encode($file_name)."?=\n\n";
+	$body .= $message."\n";
+	$body .= "--$boundary\n";
+	$file = fopen($file_name, "r"); //Открываем файл
+	$text = fread($file, filesize($file_name)); //Считываем весь файл
+	fclose($file); //Закрываем файл
+	/* Добавляем тип содержимого, кодируем текст файла и добавляем в тело письма */
+	$body .= "Content-Type: application/octet-stream; name==?utf-8?B?".base64_encode($file_name)."?=\n";
+	$body .= "Content-Transfer-Encoding: base64\n";
+	$body .= "Content-Disposition: attachment; filename==?utf-8?B?".base64_encode($file_name)."?=\n\n";
+	$body .= chunk_split(base64_encode($text))."\n";
+	$body .= "--".$boundary ."--\n";
+	mail($to, $subject, $body, $headers); //Отправляем письмо
+	}
+//********************************************ИМПОРТ***************************************************
+	if ($form_state['clicked_button']['#id'] == 'vah') {
+drupal_set_message('УДАЛЕНИЕ АБОНЕНТОВ ПРОШЕДШИХ ВЫГРУЗКУ!');
+//
+	global $db_url;
+	$db_url = array(
+	"default"=>$db_url,
+	"db1"=>"mysqli://abonent:Ab0nent@localhost/abonent"
+	);
+	db_set_active('db1');
+	$queryResult = db_query("delete from datain where SYSTEM = '1'");
+	db_set_active('default');
+ }
+}
+
+function export_myform_abonent($form, &$form_state) {
+//
+}
+
+function export_myform_sch($form, &$form_state) {
+//	drupal_set_message('Экспорт даныых по приборам!');
+// задаем заголовки. то есть задаем всплывающее окошко, которое позволяет нам сохранить файл
+//header('Content-type: application/csv'); // указываем, что это csv документ
+//header("Content-Disposition: inline; filename=".$file_name); // указываем файл, с которым будем работать
+//readfile($file_name); // считываем файл
+//unlink($file_name); // удаляем файл. тоесть когда вы сохраните файл на локальном компе, то после он удалится с сервера
+}

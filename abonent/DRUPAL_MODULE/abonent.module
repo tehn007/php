@@ -1,0 +1,524 @@
+<?php
+
+module_load_include('inc', 'captcha');
+
+function abonent_menu() {
+  $items['abonent/form'] = array(
+    'title' => 'Личный кабинет',
+    'page callback' => 'abonent_form',
+    'access arguments' => array('access content'),
+    'description' => 'Личный кабинет',
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+
+function abonent_form() {
+  return drupal_get_form('abonent_myform');
+}
+
+// Добавляем дополнительную логику в функцию строитель,
+// чтобы обеспечить разделение на в две страницы. Мы проверяем
+// значение в $form_state['storage'], чтобы узнать какую страницу
+// нужно отображать в данный момент.
+function abonent_myform($form_state) {
+
+// Показываем страницу-2, если выставлено значение $form_state['storage']['page_active']
+  if (isset($form_state['storage']['page_active'])) {
+    $id = $form_state['storage']['id'];
+    return abonent_myform_page_active($id);
+  }
+// Показываем страницу-2, если выставлено значение $form_state['storage']['page_two']
+  if (isset($form_state['storage']['page_two'])) {
+    $id = $form_state['storage']['id'];
+    return abonent_myform_page_two($id);
+  }
+
+// Страница-1 отображается, если не выставленно значение $form_state['storage']['page_two']
+  $form['name'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Абонент',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  $form['name']['first'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Лицевой счет',
+    '#default_value' => $form_state['values']['first'],
+    '#description' => "Пожалуйста введите ваш логин.",
+    '#size' => 30,
+    '#maxlength' => 30,
+  );
+  $form['name']['middle'] = array(
+    '#type' => 'password',
+    '#title' => 'Пароль',
+    '#description' => "Пожалуйста введите ваш пароль.",
+    '#default_value' => $form_state['values']['middle'],
+    '#size' => 30,
+    '#maxlength' => 30,
+  );
+
+$form['name']['captcha'] = array(
+  '#type' => 'captcha',
+  '#captcha_type' => 'captcha/Math',
+);
+
+$form['name']['one'] = array(
+  '#type' => 'checkbox',
+  '#title' => 'Я разрешаю использование моих персональных данных.',
+  '#default_value' => $form_state['values']['one'],
+);
+
+//
+  $form['clear'] = array(
+    '#type' => 'submit',
+    '#value' => "Очистить",
+    '#validate' => array('abonent_myform_clear'),
+  );
+
+  $form['next'] = array(
+    '#type' => 'submit',
+    '#value' => "Далее",
+  );
+
+$test = '<p></p>';
+//*********************************************************************************
+$form['information'] = array(
+    '#type' => 'item',
+    '#title' => '',
+    '#description' => $test,
+  );
+//*********************************************************************************
+
+
+   return $form;
+}
+
+// Вторая форма.
+function abonent_myform_page_two($id) {
+//
+	db_set_active('db1');
+	$queryResult = db_query("SELECT * FROM kiya WHERE LSHET = '$id'");
+	$links = db_fetch_object($queryResult);
+//
+//Проверка типа
+//***	if ( $links->sch_type == 'ИСТИНА') {
+	if ( $links->SCH_TYPE == '1') {
+	$type = "Счетчик";
+	}
+	else {
+	$type = "Норматив";
+	}
+//
+//Определение переменных для вывода в формах
+//
+	$t = "<p><b>Объект:</b> <i>".$links->ADRES."</i></p><p><b>Количество: </b><i>".$links->KOL_P."</i> чел.<p><b>площади</b> : <i>".$links->SQ." </i>кв.м.</p><p><b>Установленное оборудование: </b><i>".$links->EQUIPMENT."</i></p>";
+	//<p><b>Тип: </b><i>".$type."</i></p>
+
+//***	$t_ras = "<p><b>Дата последней оплаты: </b><i>".$links->D_OPL."</i></p><br/><div align='center'><table border='1' width='100%'><tr><td align='center' width='45%'>Наименование</td><td align='center' width='11%'>долг(+)/аванс(-)</td><td align='center' width='11%'>Начислено</td><td align='center' width='11%'>Перерасчет</td><td align='center' width='11%'>Оплачено</td><td align='center' width='11%'>Итого</td></tr>";
+$t_ras = "<p><b>Дата последней оплаты: </b><i>".date("d.m.Y",strtotime($links->D_OPL))."</i></p><br/><div align='center'><table border='1' width='100%'><tr><td align='center' width='45%'>Наименование</td><td align='center' width='11%'>долг(+)/аванс(-)</td><td align='center' width='11%'>Начислено</td><td align='center' width='11%'>Перерасчет</td><td align='center' width='11%'>Оплачено</td><td align='center' width='11%'>Итого</td></tr>";
+
+//
+db_set_active('db1');
+$queryResult = db_query("SELECT * FROM knya WHERE LSHET = '$id'");
+$sn = 0;$nach = 0;$korr = 0;$Oplata = 0;$sk = 0;
+while ($row = db_fetch_array($queryResult)) {
+
+$sn_View = str_replace(",",".",$row[S_NACH]); if ($sn_View == 0) {$sn_View = '-';} else {$sn_View=number_format($sn_View, 2, '.', ' ');}
+$nach_View = str_replace(",",".",$row[NACH]); if ($nach_View == 0) {$nach_View = '-';} else {$nach_View=number_format($nach_View, 2, '.', ' ');}
+$korr_View = str_replace(",",".",$row[KORR]); if ($korr_View == 0) {$korr_View = '-';} else {$korr_View=number_format($korr_View, 2, '.', ' ');}
+$Oplata_View = str_replace(",",".",$row[OPLATA]); if ($Oplata_View == 0) {$Oplata_View = '-';} else {$Oplata_View=number_format($Oplata_View, 2, '.', ' ');}
+$sk_View = str_replace(",",".",$row[S_KON]); if ($sk_View == 0) {$sk_View = '-';} else {$sk_View=number_format($sk_View, 2, '.', ' ');}
+
+$t_ras .= "
+<tr>
+<td align='center'>$row[USLUGA]</td>
+<td align='center'>".$sn_View."</td>
+<td align='center'>".$nach_View."</td>
+<td align='center'>".$korr_View."</td>
+<td align='center'>".$Oplata_View."</td>
+<td align='center'>".$sk_View."</td>
+</tr>
+";
+$sn += str_replace(",",".",$row[S_NACH]);$nach += str_replace(",",".",$row[NACH]);$korr += str_replace(",",".",$row[KORR]);$Oplata += str_replace(",",".",$row[OPLATA]);$sk += str_replace(",",".",$row[S_KON]);
+}
+if ($sn == 0) {$sn = '-';} else {$sn=number_format($sn, 2, '.', ' ');}
+if ($nach == 0) {$nach = '-';} else {$nach=number_format($nach, 2, '.', ' ');}
+if ($korr == 0) {$korr = '-';} else {$korr=number_format($korr, 2, '.', ' ');}
+if ($Oplata == 0) {$Oplata = '-';} else {$Oplata=number_format($Oplata, 2, '.', ' ');}
+if ($sk == 0) {$sk = '-';} else {$sk=number_format($sk, 2, '.', ' ');}
+$t_ras .= "
+<tr>
+<td align='center'><b>Итого, руб.</b></td>
+<td align='center'><b>$sn</b></td>
+<td align='center'><b>$nach</b></td>
+<td align='center'><b>$korr</b></td>
+<td align='center'><b>$Oplata</b></td>
+<td align='center'><b>$sk</b></td>
+</tr>
+</table></div>";
+
+//Определить месяц расчета
+$m = getRusMonth(date(m));
+//возврат БД
+	db_set_active('default');
+//
+//Вывод форм
+$form['inf'] = array(
+    '#type' => 'item',
+    '#title' => '',
+    '#description' => "<div class='h1_title'>Абонент: <i>".$links->ABONENT."</i></div><div class='h1_title'>Лицевой счет: <i>".$links->LSHET."</i></div>",
+  );
+
+$form['gaz'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Общие сведения',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => $t,
+  );
+  $form['ras'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Информация о расчетах за '.$m.' месяц',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => $t_ras,
+  );
+//
+//***if ( $links->SCH_TYPE == 'ИСТИНА') {
+if ( $links->SCH_TYPE == '1') {
+
+  $t_uchet = "<p><b>Тип установленного прибора: </b><i>".$links->SCH."</i></p><p><b>Установленный срок очередной поверки прибора: </b><i>".date("d.m.Y",strtotime($links->SCH_POV))."</i></p><p><b>Последние показания прибора и дата их предоставления: </b><i>".$links->SCH_COUNT."</i> на ".date("d.m.Y",strtotime($links->SCH_CDATE))."</p>";
+
+  $form['uchet'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Сведения о приборе учета',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => $t_uchet,
+  );
+ $form['in'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Ввод показаний прибора',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+	db_set_active('db1');
+	$queryResult = db_query("SELECT * FROM datain WHERE LSHET = '$id'");
+	$links = db_fetch_object($queryResult);
+		if ($links->SYSTEM <> 1) {
+			if ($links->SCH_IN == 0 || !isset($links->SCH_IN))
+	 		{
+				$s_ch='Введите текущие показания прибора';
+			}
+			else	{
+				$s_ch='Вы ввели следующие показаения прибора: <i>'.$links->SCH_IN.'</i> на '.$links->DATE_SCH.' <br /> Вы можете их изменить';
+			}
+			$form['in']['sh'] = array('#type' => 'textfield','#title' => $s_ch,'#default_value' => $form_state['values']['sh'],);
+			$form['in']['submit'] = array('#id'=>'sh','#type' => 'submit','#value' => t('Submit'),);
+		}
+		else {
+		$s_ch='Извините, в настоящий момент введенные Вами показания прибора учета переданы. После обработки Вы сможете ввести данные за следующий период';
+		$form['in']['sh'] = array('#type' => 'item','#title' => $s_ch,);
+		}
+}
+//******************************TELEPHONE******************************************
+  $form['tel'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Сведения о телефоне',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+
+$des = "Введите номер телефона используя только цифры (без пробелов и тире)";
+$form['tel']['descr'] = array('#type' => 'item','#title' => $des,);
+	db_set_active('db1');
+	$queryResult = db_query("SELECT * FROM tel WHERE LSHET = '$id'");
+	$links = db_fetch_object($queryResult);
+		if ($links->SYS <> 1) {
+			if ($links->TEL == 0 || empty($links->TEL))
+	 		{
+//запрос к основной таблице
+	db_set_active('db1');
+	$queryResultT = db_query("SELECT * FROM kiya WHERE LSHET = '$id'");
+	$linksT = db_fetch_object($queryResultT);
+	$db = db_affected_rows($queryResultT);
+	db_set_active('default');
+	if ($db > 0 ){
+				$tel_ch='Вы ввели следующий номер телефона: <i>'.$linksT->TEL.'</i> <br /> Вы можете его изменить';
+		    }
+	else{
+				$tel_ch='Введите номер Вашего телефона';
+	}
+			}
+			else	{
+				$tel_ch='Вы ввели следующий номер телефона: <i>'.$links->TEL.'</i> <br /> Вы можете его изменить';
+			}
+		        $form['tel']['nomer'] = array('#type' => 'textfield','#title' => $tel_ch,'#default_value' => $form_state['values']['nomer'],);
+		        $form['tel']['submitT'] = array('#id'=>'nomerT','#type' => 'submit','#value' => 'Отправить ',);
+		}
+		else {
+		$tel_ch='Извините, в настоящий момент введенные Вами данные обрабатываются. После обработки Вы сможете их изменить '.$links->TEL;
+	        $form['tel']['nomer'] = array('#type' => 'item','#title' => $tel_ch,);
+		}
+//***************************END TELEPHONE*****************************************
+//
+ $form['gonah'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Выход из личного кабинета',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => 'Для выхода нажмите на кнопку "Выход"',
+
+  );
+ $form['gonah']['clear'] = array(
+    '#type' => 'submit',
+    '#value' => "Выход",
+    '#validate' => array('abonent_myform_clear'),
+  );
+db_set_active('default');
+  return $form;
+}
+
+function abonent_myform_clear($form, &$form_state) {
+  unset($form_state['values']); // Принудительно очищаем возможные
+  unset($form_state['storage']); // значения в памяти.
+  $form_state['rebuild'] = TRUE;
+}
+
+// Изменяем обработчик так, чтобы он правильно работал в зависимости
+// от того, на каком шаге была отправлена форма. Если мы на первом шаге,
+// то устанавливаем $form_state['storage']['page_two'], после чего форма
+// перегрузится и будет знать, что нужно отображать второй шаг.
+// Если же форма была отправлена на втором шаге, то следует показать
+// пользователю сообщение об успешном завершении операции и
+// переместить его на другую страницу.
+
+function abonent_myform_submit($form, &$form_state) {
+//Обработка занесения данных по прибору учета
+ if ($form_state['clicked_button']['#id'] == 'sh') {
+	$ls =$form_state['storage']['id'];
+	$sh = $form_state['values']['sh'];
+$d=date('d.m.Y');
+//drupal_set_message('Ваши данные:'.$ls.'...'.$sh);
+	global $db_url;
+	$db_url = array(
+	"default"=>$db_url,
+	"db1"=>"mysqli://abonent:Ab0nent@localhost/abonent"
+	);
+	db_set_active('db1');
+	$queryResult = db_query("select * from datain where LSHET = '$ls'");
+$db = db_affected_rows($queryResult);
+db_set_active('default');
+if ($db > 0 )
+{
+	db_set_active('db1');
+	$queryResult = db_query("UPDATE  datain SET SCH_IN =  '$sh',DATE_SCH = '$d' WHERE LSHET = '$ls'");
+db_set_active('default');
+}
+else
+{
+	db_set_active('db1');
+	$queryResult = db_query("INSERT INTO datain (LSHET,SCH_IN,DATE_SCH) VALUES ('$ls','$sh','$d')");
+db_set_active('default');
+}
+db_set_active('default');
+$form_state['rebuild'] = TRUE;
+}
+//Обработка занесения телефона
+ if ($form_state['clicked_button']['#id'] == 'nomerT') {
+//drupal_set_message('номер '.$form_state['clicked_button']['#name']);
+	$ls =$form_state['storage']['id'];
+	$nomer = $form_state['values']['nomer'];
+     if (!empty($nomer)) {
+drupal_set_message('Вы ввели номер: '.$nomer);
+	global $db_url;
+	$db_url = array(
+	"default"=>$db_url,
+	"db1"=>"mysqli://abonent:Ab0nent@localhost/abonent"
+	);
+	db_set_active('db1');
+	$queryResult = db_query("select * from tel where LSHET = '$ls'");
+$db = db_affected_rows($queryResult);
+db_set_active('default');
+if ($db > 0 )
+{
+	db_set_active('db1');
+	$queryResult = db_query("UPDATE  tel set TEL =  '$nomer' WHERE LSHET = '$ls'");
+db_set_active('default');
+}
+else
+{
+	db_set_active('db1');
+	$queryResult = db_query("INSERT INTO tel (LSHET,TEL) VALUES ('$ls','$nomer')");
+db_set_active('default');
+}
+     }
+     else {drupal_set_message('Вы ввели неправильный номер телефона!');
+	$des = 'НЕПРАВИЛЬНЫЙ НОМЕР ТЕЛЕФОНА!';
+	}
+db_set_active('default');
+$form_state['rebuild'] = TRUE;
+}
+// Обработка первого шага
+	$c = $form_state['values']['first'];
+	$sh = $form_state['values']['sh'];
+	global $db_url;
+	$db_url = array(
+	"default"=>$db_url,
+	"db1"=>"mysqli://abonent:Ab0nent@localhost/abonent"
+	);
+	db_set_active('db1');
+	$queryResult = db_query("SELECT * FROM kuya WHERE LSHET = '$c'");
+	$links = db_fetch_object($queryResult);
+	$test = $links->LSHET;
+	db_set_active('default');
+//	drupal_set_message($links->PASS.'Вход '.$test);
+//
+  if ($form_state['clicked_button']['#id'] == 'edit-next') {
+if ($form_state['values']['one'] == true) {
+drupal_set_message('Получено разрешение на обработку Ваших персональных данных!');
+//запрос к MySQL по проверке Логина и Пароля. Переход дальше только при правильной проверке.
+	if ($links->LSHET == $c) //если нашлась одна строка, значит такой юзер существует в БД
+	{
+//	$links = db_fetch_object($queryResult);
+		if ($form_state['values']['middle'] == $links->PASS)
+		{
+//***                  if ($links->ACTIVE == 'ИСТИНА') //зАПРОС ПРИЗНАКА АКТИВАЦИИ
+                  if ($links->ACTIVE == '1') //зАПРОС ПРИЗНАКА АКТИВАЦИИ
+                  {
+//*** ЕСЛИ ВСЕ ПРОВЕРКИ ПРОЙДЕНЫ - ПЕРЕХОД К 2 ФОРМЕ
+                    $form_state['storage']['page_one_values'] = $form_state['values'];
+                    $form_state['storage']['id'] = $c;
+                    $form_state['storage']['page_two'] = TRUE; // Устанавливаем флаг для функции-строителя
+                    drupal_set_message('Вход в личный кабинет выполнен.');
+                  }
+                  else
+                  {
+		    $form_state['storage']['id'] = $c;
+                    $form_state['storage']['page_active'] = TRUE; // Устанавливаем флаг для функции-строителя
+                  }
+        }
+	else //если пароли не совпали
+		{
+		drupal_set_message('Вход в личный кабинет не выполнен. Неверный пароль!');
+		}
+	}
+	else
+	{
+	drupal_set_message('Вход в личный кабинет не выполнен. Неправильное имя пользователя!');
+	}
+}
+else{
+drupal_set_message('Нужно разрешение на обработку Ваших персональных данных!');
+}
+
+//
+//
+  }
+
+// Второй шаг, финальный обработчик.
+//  else {
+// Сохранение данных в MySQL.-------------------------MySQL---------------------------
+
+// сообщения об успешном завершении операции.
+//    drupal_set_message('Вход в личный кабинет выполнен. Вы вошли как пользователь : <i>'.$form_state['storage']['page_one_values']['first'].'</i>.');
+//    drupal_set_message('Ваши данные :<i>'.$form_state['values']['schetchik'].'</i> занесены в таблицу.');
+
+// Это значение должно быть очищено, чтобы редирект состоялся.
+// Дело в том, что если оно не пустое, $form_state['rebuild'] автоматически
+// устанавливается в TRUE (см. первый пункт документации:
+// http://drupal.org/node/144132
+//    unset ($form_state['storage']);
+// Отправляем пользователя на главную страницу
+//$form_state['redirect'] = '';
+//  }
+
+$form_state['storage']['sh']= $sh;
+
+}
+
+
+
+function getRusMonth($month){
+  if($month > 12 || $month < 1) return FALSE;
+  $aMonth = array('январь', 'февраль', 'март', 'апрел', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь');
+  return $aMonth[$month - 1];
+}
+
+function abonent_myform_page_active($id) {
+drupal_set_message('Начальная активация пользователя');
+//Вывод форм
+	db_set_active('db1');
+	$queryResult = db_query("SELECT * FROM kiya WHERE LSHET = '$id'");
+	$links = db_fetch_object($queryResult);
+$form['inf'] = array(
+    '#type' => 'item',
+    '#title' => '',
+    '#description' => "<div class='h1_title'>Абонент: <i>".$links->ABONENT."</i></div><div class='h1_title'>Лицевой счет: <i>".$links->LSHET."</i></div>",
+  );
+//
+	db_set_active('db1');
+	$queryResult = db_query("SELECT * FROM datain WHERE LSHET = '$id'");
+	$links = db_fetch_object($queryResult);
+		if ($links->CHK == 1)
+			{
+				$text = 'Ваш запрос на активацию передан! Обработка запроса на активацию личного кабинета занимает около недели.';
+				$run = array();
+			}
+		else	{
+				$text = 'Для отправки запроса на активацию нажмите на кнопку "Выполнить"';
+				$run =array('#type' => 'submit','#value' => "Выполнить",'#validate' => array('abonent_myform_active_in'), '#id'=>'activ',);
+			}
+//
+ $form['active'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'активация пользователя',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => $text,
+  );
+
+  $form['active']['submit'] = $run;
+
+ $form['go'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Выход из личного кабинета',
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#description' => 'Для выхода нажмите на кнопку "Выход".',
+  );
+ $form['go']['clear'] = array(
+    '#type' => 'submit',
+    '#value' => "Выход",
+    '#validate' => array('abonent_myform_clear'),
+  );
+db_set_active('default');
+  return $form;
+}
+
+function abonent_myform_active_in($form, &$form_state) {
+$ls =$form_state['storage']['id'];
+	global $db_url;
+	$db_url = array(
+	"default"=>$db_url,
+	"db1"=>"mysqli://abonent:Ab0nent@localhost/abonent"
+	);
+	db_set_active('db1');
+//drupal_set_message('Активируем!'.$ls);
+$queryResult = db_query("select * from datain WHERE LSHET = '$ls'");
+$links = db_fetch_object($queryResult);
+
+		if (isset($links->CHK))	{
+// && ($links->CHK <> 1)
+//      	$queryResult = db_query("UPDATE  datain SET CHK =  '1', SYSTEM = '1' WHERE LSHET = '$ls'");
+      	$queryResult = db_query("UPDATE  datain SET CHK =  '1' WHERE LSHET = '$ls'");
+		}
+        else {
+		$queryResult = db_query("INSERT INTO datain (LSHET,CHK) VALUES ('$ls','1')");
+        }
+	db_set_active('default');
+
+  $form_state['rebuild'] = TRUE;
+}

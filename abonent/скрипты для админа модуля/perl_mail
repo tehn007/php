@@ -1,0 +1,107 @@
+#!/usr/bin/perl
+# mailattach.pl
+ 
+  use strict;
+  use warnings;
+  use Net::IMAP::Simple;
+  use Mail::Header;
+  use Archive::Tar;
+# для крона - переходим в директорию локации скрипта
+$0=~/^(.+[\\\/])[^\\\/]+[\\\/]*$/;
+my $cgidir= $1 || "./";
+chdir $cgidir;
+# параметры windows ресурса 
+#    my $SMBSERVER="//wynserver";  # имя сервера
+#    my $SMBSHARE="/Public";     # имя общего ресурса на сервере
+    my $SMBDIR="/scripts/dbf";        # папка, в которую будем выкладывать вложения
+# параметры почтового ящика
+    my $mailhost = "10.4.176.8";
+    my $mailuser = "info";
+    my $mailpass = 'Odmin007';
+    my $mailfolder = "INBOX"; # папка, в которой проверяем почту
+#    my $mailNewFolder = "read"; # папка, в которую перекладываем прочтенные письма
+# создаем подключение к серверу
+my $imap = Net::IMAP::Simple->new(
+    $mailhost,
+    port    => 993,
+    use_ssl => 0,
+    debug => 0,
+    ) || die "Unable to connect to IMAP: $Net::IMAP::Simple::errstr\n";
+ 
+if(!$imap->login($mailuser,$mailpass)){
+   print STDERR "Login failed: " . $imap->errstr . "\n";
+   exit(64);
+}
+#Удаляем всё из папки /scripts/dbf
+#из этой папки потом происходит импорт в mysql
+    system ("/bin/rm -rf /scripts/dbf/*");
+#Лог
+#    system ("echo 'Import from mailbox to /scripts/dbf/  > /scripts/maintenance/Abonent/mail.log'");
+# Читаем входящие сообщения
+my $nm = $imap->select($mailfolder);
+# Последователь проходим по списку сообщений
+for(my $i = 1; $i <= $nm; $i++){
+    # Получаем список служебных заголовков письма
+    my $header = $imap->top($i);
+    # Разбиваем заголовки на отдельные состовляющие
+    my $head_obj = Mail::Header->new($header);
+    # по теме письма формируем имя директории для сохранения вложений
+my $subj = $head_obj->get('Subject');
+ if  ($subj =~/abonent/) {
+#######
+#    my $dir = $head_obj->get('Subject').$i;
+     my $dir = "inbox".$i;
+    # удаляем все не словарные символы,
+    # для исключения проблем с созданием папок в windows
+#    $dir =~ s/\W+//g;
+    # Сохраняем текущее собщение в файл
+    open MSGFILE,"> res/msg".$i or die "Couldn't open file: \n";
+    print MSGFILE @{ $imap->get($i) };
+    close MSGFILE;
+    # перемещаем сообщение в папу обработанных
+    # если папка для перемещения не создана письмо будет только удалено
+#    $imap->copy($i,$mailNewFolder);
+    $imap->delete($i);
+    # разбираем письмо на вложения
+    system ("/usr/local/bin/ripmime","-ires/msg".$i,"-dres/$dir");
+    # копируем файлы на ресурс windows
+    # переходим в папку с вложениями 
+#    chdir "res/".$dir or die "Can't cd $!\n";
+    system("cd res/$dir");
+    my $file ="";
+    my $dirname = "res/".$dir;
+    opendir(BIN, $dirname) or die "Can't open $dir: $!";
+    while( defined ($file = readdir BIN) ) {
+	if ($file =~ /.RAR$/i) {
+#my $tar = Archive::Tar->new();
+#$tar->read($file);
+#$tar->extract();
+	    #Переименование файла в *.rar
+            my $newfile = $file;
+		$newfile =~ s/\.RAR$/.rar/;
+            if (-e $newfile) {
+	    warn "can't rename $file to $newfile: $newfile exists\n";
+    	    } elsif (rename $dirname."/".$file, $dirname."/".$newfile) {
+            ## Успешное переименование, ничего не делать
+            } else {
+            warn "rename $file to $newfile failed: $!\n";
+            }
+            system ("rar x $dirname/$newfile res/$dir");
+	}
+    }
+    closedir(BIN); 
+    # prompt - необходим, что бы не подтверждать копирование каждого файла в команде mput
+   
+#    my $SMBCMD="prompt;cd $SMBDIR;mkdir $dir;cd $dir;rm *;mput *.png;exit";
+    system ("cp res/$dir/*.DBF /scripts/dbf");
+#    my $SMBCMD="cd $SMBDIR;rm *;exit";
+#    system ("-c$SMBCMD");
+#    chdir "../../";
+#######
+ }
+}
+# чистим директорию с временными файлами
+system ("/bin/rm -rf res/*");
+# Закрываем подключение к imap серверу
+$imap->quit;
+exit 0;
